@@ -35,9 +35,20 @@ const importData = async (req, res) => {
 // @desc    Create a new product
 // @route   POST /api/products
 // @access  Private/Admin
-const createProduct = (req, res) => {
-  // Logic to create a new product will go here
-  res.send('Create Product route');
+const createProduct = async (req, res) => {
+  const { name, image, description, category, price, countInStock } = req.body;
+
+  const product = new Product({
+    name: name,
+    image: image,
+    description: description,
+    category: category,
+    price: price,
+    countInStock: countInStock,
+  });
+
+  const createdProduct = await product.save();
+  res.status(201).json(createdProduct);
 };
 
 // @desc    Update a product
