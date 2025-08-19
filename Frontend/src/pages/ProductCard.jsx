@@ -2,18 +2,17 @@ import React from 'react';
 
 const ProductCard = ({ product }) => {
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden transform transition-transform duration-300 hover:scale-105">
-      <img
-        src={product.image}
-        alt={product.name}
-        className="w-full h-48 object-cover"
-        onError={(e) => {
-          e.target.src = "https://placehold.co/400x300/F0F0F0/ADADAD?text=Image+Not+Found";
-        }}
-      />
-      <div className="p-4">
-        <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
-        <p className="text-gray-600 mt-1">${product.price.toFixed(2)}</p>
+    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <img src={product.image} alt={product.name} className="w-full h-60 object-cover" />
+      <div className="p-6">
+        <h3 className="text-2xl font-semibold text-gray-900">{product.name}</h3>
+        <p className="text-gray-600 mt-2">{product.description}</p>
+        <p className="text-xl font-bold text-red-600 mt-4">${product.price.toFixed(2)}</p>
+        <button
+          className="mt-4 inline-block bg-red-600 text-white px-6 py-3 rounded-full text-lg font-medium hover:bg-red-700 transition duration-300"
+        >
+          Add to Cart
+        </button>
       </div>
     </div>
   );
