@@ -1,4 +1,4 @@
-# E-commerce Application
+# E-commerce Sweet Shop Application (KRISHNA)
 
 This is a full-stack e-commerce application with a React frontend and a Node.js backend.
 
