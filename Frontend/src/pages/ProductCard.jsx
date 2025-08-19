@@ -1,9 +1,19 @@
 import React from 'react';
 
 const ProductCard = ({ product }) => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  // Ensure the product image path doesn't start with a slash or '/uploads'
+  const imagePath = product.image.startsWith('/uploads/') ?
+    product.image.substring('/uploads/'.length) :
+    product.image.startsWith('/') ?
+      product.image.substring(1) :
+      product.image;
+
+  const imageUrl = `${backendUrl}/uploads/${imagePath}`;
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-      <img src={product.image} alt={product.name} className="w-full h-60 object-cover" />
+      <img src={imageUrl} alt={product.name} className="w-full h-60 object-cover" />
       <div className="p-6">
         <h3 className="text-2xl font-semibold text-gray-900">{product.name}</h3>
         <p className="text-gray-600 mt-2">{product.description}</p>
