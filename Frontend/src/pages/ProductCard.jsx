@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import CartContext from '../context/CartContext';
 
 const ProductCard = ({ product }) => {
+  const { addToCart } = useContext(CartContext);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   // Ensure the product image path doesn't start with a slash or '/uploads'
   const imagePath = product.image.startsWith('/uploads/') ?
@@ -11,6 +13,10 @@ const ProductCard = ({ product }) => {
 
   const imageUrl = `${backendUrl}/uploads/${imagePath}`;
 
+  const handleAddToCart = () => {
+    addToCart(product, 1);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <img src={imageUrl} alt={product.name} className="w-full h-60 object-cover" />
@@ -19,6 +25,7 @@ const ProductCard = ({ product }) => {
         <p className="text-gray-600 mt-2">{product.description}</p>
         <p className="text-xl font-bold text-red-600 mt-4">${product.price.toFixed(2)}</p>
         <button
+          onClick={handleAddToCart}
           className="mt-4 inline-block bg-red-600 text-white px-6 py-3 rounded-full text-lg font-medium hover:bg-red-700 transition duration-300"
         >
           Add to Cart
