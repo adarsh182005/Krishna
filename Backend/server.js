@@ -4,8 +4,9 @@ import connectDB from './config/db.js';
 import productRoutes from './routes/productRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js'; // Add this import
 import cors from 'cors';
-import path from 'path'; // Import the path module
+import path from 'path';
 
 dotenv.config();
 
@@ -13,6 +14,11 @@ connectDB();
 
 const app = express();
 
+// IMPORTANT: Webhook route MUST come before express.json() middleware
+// Stripe webhooks need raw body, not JSON parsed body
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
+
+// Regular middleware
 app.use(express.json());
 app.use(cors());
 
@@ -27,9 +33,11 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
+// API Routes
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payment', paymentRoutes); // Add this line
 
 const PORT = process.env.PORT || 5000;
 

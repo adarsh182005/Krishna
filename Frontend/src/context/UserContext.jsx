@@ -1,13 +1,11 @@
 import { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('userToken');
@@ -28,13 +26,15 @@ export const UserProvider = ({ children }) => {
     );
     localStorage.setItem('userToken', data.token);
     setUser({ token: data.token });
-    navigate('/products');
+    // Return success so components can handle navigation
+    return { success: true, user: { token: data.token } };
   };
 
   const logout = () => {
     localStorage.removeItem('userToken');
     setUser(null);
-    navigate('/login');
+    // Return success so components can handle navigation
+    return { success: true };
   };
 
   return (
@@ -44,4 +44,6 @@ export const UserProvider = ({ children }) => {
   );
 };
 
+// Add named export
+export { UserContext };
 export default UserContext;
