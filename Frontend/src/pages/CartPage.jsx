@@ -4,10 +4,11 @@ import { ShoppingBag, CreditCard } from 'lucide-react';
 import CartContext from '../context/CartContext';
 import { UserContext } from '../context/UserContext';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 const CartPage = () => {
   const { cartItems, addToCart, removeFromCart, clearCart } = useContext(CartContext);
-  const { user } = useContext(UserContext);
+  const { user } = useContext(UserContext); // Get user object directly from context
   const navigate = useNavigate();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [loading, setLoading] = useState(false);
@@ -46,8 +47,9 @@ const CartPage = () => {
   };
 
   const handleCheckout = async () => {
-    // Check if user is logged in
-    if (!user) {
+    // Check if user is logged in using the user context
+    if (!user || !user.token) {
+      toast.error('You must be logged in to proceed to checkout.');
       navigate('/login', { state: { from: '/cart' } });
       return;
     }
@@ -60,16 +62,21 @@ const CartPage = () => {
 
       // Create order
       const orderData = {
-        items: cartItems.map(item => ({
-          productId: item._id,
+        orderItems: cartItems.map(item => ({
           name: item.name,
+          qty: item.qty,
+          image: item.image,
           price: item.price,
-          quantity: item.qty,
-          image: item.image
+          product: item._id // Use `product` to match the backend schema
         })),
-        totalAmount: totalAmount,
-        paymentStatus: 'pending',
-        status: 'pending'
+        totalPrice: totalAmount,
+        paymentMethod: 'Stripe', // Assuming a default payment method
+        shippingAddress: { // Placeholder shipping address
+          address: '123 Sweet Street',
+          city: 'Candy Town',
+          postalCode: '12345',
+          country: 'India'
+        }
       };
 
       const response = await axios.post(
@@ -77,7 +84,8 @@ const CartPage = () => {
         orderData,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            // Correctly retrieve the token from the user context
+            'Authorization': `Bearer ${user.token}`, 
             'Content-Type': 'application/json'
           }
         }
@@ -86,7 +94,7 @@ const CartPage = () => {
       if (response.data._id) {
         // Clear cart after successful order creation
         clearCart();
-        
+        toast.success('Order created successfully!');
         // Redirect to payment page
         navigate(`/payment/${response.data._id}`);
       }
@@ -98,7 +106,8 @@ const CartPage = () => {
                           error.response?.data?.error || 
                           'Failed to create order. Please try again.';
       
-      alert(errorMessage);
+      // Replaced alert with toast for a better user experience
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
