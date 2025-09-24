@@ -1,22 +1,18 @@
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();   // ✅ must be at the top before other imports
+
+import express from 'express';
 import connectDB from './config/db.js';
 import productRoutes from './routes/productRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js'; // Add this import
+import paymentRoutes from './routes/payment.js';
 import cors from 'cors';
 import path from 'path';
-
-dotenv.config();
 
 connectDB();
 
 const app = express();
-
-// IMPORTANT: Webhook route MUST come before express.json() middleware
-// Stripe webhooks need raw body, not JSON parsed body
-app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
 // Regular middleware
 app.use(express.json());
@@ -25,8 +21,7 @@ app.use(cors());
 // Get the directory name for the current module's path
 const __dirname = path.resolve();
 
-// This middleware serves static files from the 'uploads' folder
-// The path '/uploads' is what your frontend will use to access the images
+// Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
 app.get('/', (req, res) => {
@@ -37,7 +32,7 @@ app.get('/', (req, res) => {
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/payment', paymentRoutes); // Add this line
+app.use('/api/payment', paymentRoutes);  // payment.js handles webhook
 
 const PORT = process.env.PORT || 5000;
 

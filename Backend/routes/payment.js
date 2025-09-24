@@ -1,35 +1,42 @@
-const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+import express from 'express';
+import Stripe from 'stripe';
+import Order from '../models/orderModel.js';
+import { protect } from '../middleware/authMiddleware.js';
+import dotenv from 'dotenv';
+
+// Load environment variables in this file too
+dotenv.config();
+
 const router = express.Router();
-const Order = require('../models/Order'); // Assuming you have an Order model
-const auth = require('../middleware/auth'); // Your auth middleware
+
+// Debug: Check if the key is loaded
+console.log('Stripe Key in payment.js:', process.env.STRIPE_SECRET_KEY ? 'Loaded' : 'NOT LOADED');
+
+const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2024-06-20', // keep SDK stable
+});
+
+// ... rest of your code
 
 // Create payment intent
-router.post('/create-payment-intent', auth, async (req, res) => {
+router.post('/create-payment-intent', protect, async (req, res) => {
   try {
     const { amount, orderId, items } = req.body;
-    
-    // Validate the amount by calculating from cart items
+
     const calculatedAmount = items.reduce((total, item) => {
-      return total + (item.price * item.quantity);
+      return total + item.price * item.quantity;
     }, 0);
-    
+
     if (Math.abs(amount - calculatedAmount) > 0.01) {
       return res.status(400).json({ error: 'Amount mismatch' });
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to paise (smallest currency unit)
+    const paymentIntent = await stripeClient.paymentIntents.create({
+      amount: Math.round(amount * 100), // Stripe expects amount in paise
       currency: 'inr',
       metadata: {
-        orderId: orderId,
+        orderId,
         userId: req.user.id,
-        items: JSON.stringify(items.map(item => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })))
       },
       automatic_payment_methods: {
         enabled: true,
@@ -38,9 +45,8 @@ router.post('/create-payment-intent', auth, async (req, res) => {
 
     res.json({
       clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
     });
-
   } catch (error) {
     console.error('Payment intent creation failed:', error);
     res.status(500).json({ error: 'Payment processing failed' });
@@ -48,22 +54,19 @@ router.post('/create-payment-intent', auth, async (req, res) => {
 });
 
 // Confirm payment and update order
-router.post('/confirm-payment', auth, async (req, res) => {
+router.post('/confirm-payment', protect, async (req, res) => {
   try {
     const { paymentIntentId, orderId } = req.body;
-    
-    // Retrieve payment intent from Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    
+    const paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+
     if (paymentIntent.status === 'succeeded') {
-      // Update order status in your database
       const order = await Order.findByIdAndUpdate(
         orderId,
         {
           paymentStatus: 'completed',
-          paymentIntentId: paymentIntentId,
+          paymentIntentId,
           status: 'confirmed',
-          paidAt: new Date()
+          paidAt: new Date(),
         },
         { new: true }
       );
@@ -75,15 +78,14 @@ router.post('/confirm-payment', auth, async (req, res) => {
       res.json({
         success: true,
         message: 'Payment confirmed successfully',
-        order: order
+        order,
       });
     } else {
       res.status(400).json({
         error: 'Payment not completed',
-        status: paymentIntent.status
+        status: paymentIntent.status,
       });
     }
-
   } catch (error) {
     console.error('Payment confirmation failed:', error);
     res.status(500).json({ error: 'Payment confirmation failed' });
@@ -91,76 +93,63 @@ router.post('/confirm-payment', auth, async (req, res) => {
 });
 
 // Webhook to handle Stripe events
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
+router.post(
+  '/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    try {
+      event = stripeClient.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error(`Webhook signature verification failed: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
-  // Handle the event
-  switch (event.type) {
-    case 'payment_intent.succeeded':
+    if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object;
       console.log('PaymentIntent succeeded:', paymentIntent.id);
-      
-      // Update order status
+
       try {
         await Order.findOneAndUpdate(
-          { paymentIntentId: paymentIntent.id },
-          { 
+          { _id: paymentIntent.metadata.orderId },
+          {
             paymentStatus: 'completed',
             status: 'confirmed',
-            paidAt: new Date()
+            paidAt: new Date(),
+            paymentIntentId: paymentIntent.id,
           }
         );
       } catch (error) {
         console.error('Failed to update order after payment success:', error);
       }
-      break;
+    } else if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object;
+      console.log('PaymentIntent failed:', paymentIntent.id);
 
-    case 'payment_intent.payment_failed':
-      const failedPayment = event.data.object;
-      console.log('PaymentIntent failed:', failedPayment.id);
-      
-      // Update order status to failed
       try {
         await Order.findOneAndUpdate(
-          { paymentIntentId: failedPayment.id },
-          { 
+          { _id: paymentIntent.metadata.orderId },
+          {
             paymentStatus: 'failed',
-            status: 'payment_failed'
+            status: 'payment_failed',
           }
         );
       } catch (error) {
         console.error('Failed to update order after payment failure:', error);
       }
-      break;
-
-    default:
+    } else {
       console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
   }
+);
 
-  res.json({ received: true });
-});
-
-// Get payment status
-router.get('/status/:paymentIntentId', auth, async (req, res) => {
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(req.params.paymentIntentId);
-    res.json({
-      status: paymentIntent.status,
-      amount: paymentIntent.amount / 100, // Convert back to rupees
-      currency: paymentIntent.currency
-    });
-  } catch (error) {
-    console.error('Failed to retrieve payment status:', error);
-    res.status(500).json({ error: 'Failed to retrieve payment status' });
-  }
-});
-
-module.exports = router;
+// ✅ This line was missing
+export default router;
