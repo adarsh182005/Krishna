@@ -4,14 +4,22 @@ import CartContext from '../context/CartContext';
 const ProductCard = ({ product }) => {
   const { addToCart } = useContext(CartContext);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  // Ensure the product image path doesn't start with a slash or '/uploads'
-  const imagePath = product.image.startsWith('/uploads/') ?
-    product.image.substring('/uploads/'.length) :
-    product.image.startsWith('/') ?
-      product.image.substring(1) :
-      product.image;
 
-  const imageUrl = `${backendUrl}/uploads/${imagePath}`;
+  // Determine the correct image URL based on whether it's an external link or a local path.
+  const getImageUrl = (image) => {
+    if (image.startsWith('http://') || image.startsWith('https://')) {
+      return image;
+    }
+    // Logic for local path (from uploaded files)
+    const imagePath = image.startsWith('/uploads/') ?
+      image.substring('/uploads/'.length) :
+      image.startsWith('/') ?
+      image.substring(1) :
+      image;
+    return `${backendUrl}/uploads/${imagePath}`;
+  };
+
+  const imageUrl = getImageUrl(product.image);
 
   const handleAddToCart = () => {
     addToCart(product, 1);

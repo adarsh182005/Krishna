@@ -1,18 +1,41 @@
 // src/pages/Login.jsx
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const Login = () => {
-  const handleSubmit = (e) => {
+const LoginPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+  const submitHandler = async (e) => {
     e.preventDefault();
-    // TODO: Implement login logic here
-    console.log('Login form submitted!');
+    setError('');
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/users/login`,
+        { email, password }
+      );
+
+      if (data.isAdmin) {
+        localStorage.setItem('userToken', data.token);
+        navigate('/dashboard'); // Redirect to admin dashboard on success
+      } else {
+        setError('You do not have administrative access.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid email or password.');
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Admin Login</h1>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={submitHandler}>
           {/* Email Input */}
           <div className="mb-4">
             <label htmlFor="email" className="block text-gray-700 text-sm font-semibold mb-2">
@@ -21,6 +44,8 @@ const Login = () => {
             <input
               type="email"
               id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="admin@example.com"
               required
@@ -35,28 +60,15 @@ const Login = () => {
             <input
               type="password"
               id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="********"
               required
             />
           </div>
-
-          {/* Remember Me and Forgot Password */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="remember"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
-                Remember Me
-              </label>
-            </div>
-            <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
-              Forgot Password?
-            </a>
-          </div>
+          
+          {error && <p className="text-red-500 text-center mb-4">{error}</p>}
 
           {/* Submit Button */}
           <button
@@ -71,4 +83,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginPage;

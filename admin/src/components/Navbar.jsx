@@ -1,7 +1,17 @@
 // src/components/Navbar.jsx
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('userToken'); // Clear the token
+    navigate('/login');
+  };
+
+  const isLoggedIn = localStorage.getItem('userToken');
+
   return (
     // Desktop (lg): Fixed position, full width, and starts after the sidebar (ml-64)
     // Mobile (Default): Full width, top of the screen.
@@ -21,7 +31,24 @@ const Navbar = () => {
             className="hidden lg:block w-64 px-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
           />
           
-          {/* Placeholder for user icon/dropdown */}
+          {/* Conditional Login/Logout Button */}
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-4 py-2 rounded-md shadow-md hover:bg-red-600 transition duration-200"
+            >
+              Logout
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-green-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-green-700 transition duration-200"
+            >
+              Login
+            </button>
+          )}
+
+          {/* User Profile Icon */}
           <div className="relative">
             <button 
               className="p-2 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"

@@ -1,5 +1,6 @@
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
+import bcrypt from 'bcryptjs'; // Ensure bcryptjs is imported here
 
 // @desc    Auth user & get token
 // @route   POST /api/users/login
@@ -14,6 +15,7 @@ const authUser = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      isAdmin: user.isAdmin,
       token: generateToken(user._id),
     });
   } else {

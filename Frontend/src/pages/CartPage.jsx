@@ -37,12 +37,16 @@ const CartPage = () => {
 
   // Normalize image path just like in ProductCard
   const getImageUrl = (image) => {
-    const imagePath = image.startsWith('/uploads/')
-      ? image.substring('/uploads/'.length)
-      : image.startsWith('/')
-      ? image.substring(1)
-      : image;
-
+    // Check if the image is a full URL (starts with http or https)
+    if (image.startsWith('http')) {
+      return image;
+    }
+    // If it's a local path, prepend the backend URL
+    const imagePath = image.startsWith('/uploads/') ?
+      image.substring('/uploads/'.length) :
+      image.startsWith('/') ?
+      image.substring(1) :
+      image;
     return `${backendUrl}/uploads/${imagePath}`;
   };
 

@@ -9,17 +9,18 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 
 function App() {
+  const isAuthenticated = localStorage.getItem('userToken');
+
   return (
     <BrowserRouter>
-      {/* We'll make the login page full-screen */}
       <Routes>
-        {/* Landing page should be Dashboard, so we redirect the root path */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
         <Route path="/login" element={<Login />} />
+
+        {/* Protected routes */}
+        <Route path="/*" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />} />
         
-        {/* All other authenticated routes use the main layout */}
-        <Route path="/*" element={<Layout />} />
+        {/* Redirect from root to dashboard if authenticated */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

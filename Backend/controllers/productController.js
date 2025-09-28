@@ -47,24 +47,52 @@ const createProduct = async (req, res) => {
     countInStock: countInStock,
   });
 
-  const createdProduct = await product.save();
-  res.status(201).json(createdProduct);
+  try {
+    const createdProduct = await product.save();
+    res.status(201).json(createdProduct);
+  } catch (error) {
+    res.status(400).json({ message: 'Failed to create product', error: error.message });
+  }
 };
 
 // @desc    Update a product
 // @route   PUT /api/products/:id
 // @access  Private/Admin
-const updateProduct = (req, res) => {
-  // Logic to update a product will go here
-  res.send('Update Product route');
+const updateProduct = async (req, res) => {
+  const { name, image, description, category, price, countInStock } = req.body;
+  const product = await Product.findById(req.params.id);
+
+  if (product) {
+    product.name = name || product.name;
+    product.image = image || product.image;
+    product.description = description || product.description;
+    product.category = category || product.category;
+    product.price = price || product.price;
+    product.countInStock = countInStock || product.countInStock;
+
+    try {
+      const updatedProduct = await product.save();
+      res.json(updatedProduct);
+    } catch (error) {
+      res.status(400).json({ message: 'Failed to update product', error: error.message });
+    }
+  } else {
+    res.status(404).json({ message: 'Product not found' });
+  }
 };
 
 // @desc    Delete a product
 // @route   DELETE /api/products/:id
 // @access  Private/Admin
-const deleteProduct = (req, res) => {
-  // Logic to delete a product will go here
-  res.send('Delete Product route');
+const deleteProduct = async (req, res) => {
+  const product = await Product.findById(req.params.id);
+
+  if (product) {
+    await product.deleteOne();
+    res.json({ message: 'Product removed' });
+  } else {
+    res.status(404).json({ message: 'Product not found' });
+  }
 };
 
 // Make sure to export all functions at the end of the file
