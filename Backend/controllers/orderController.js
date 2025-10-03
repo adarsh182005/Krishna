@@ -18,62 +18,52 @@ const addOrderItems = async (req, res) => {
     return;
   }
 
-  // --- BEGIN STOCK VALIDATION AND DEDUCTION (Using Transaction for Atomicity) ---
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     for (const item of orderItems) {
-      // 1. Get the latest product data within the transaction
       const product = await Product.findByIdAndUpdate(
         item.product,
-        { 
-          // Use $inc to atomically decrement stock, but only if enough stock exists
-          $inc: { countInStock: -item.qty } 
-        },
-        { 
-          new: false,
-          session: session 
-        }
+        { $inc: { countInStock: -item.quantity } }, // ✅ use quantity
+        { new: false, session }
       ).select('countInStock name');
-      
+
       if (!product) {
         await session.abortTransaction();
         session.endSession();
         return res.status(404).json({ message: `Product not found: ${item.name}` });
       }
 
-      // 2. Critical Stock Check (check if old stock was sufficient before proceeding)
-      if (product.countInStock < item.qty) {
+      if (product.countInStock < item.quantity) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ message: `Insufficient stock for ${item.name}. Available: ${product.countInStock}` });
+        return res.status(400).json({
+          message: `Insufficient stock for ${item.name}. Available: ${product.countInStock}`,
+        });
       }
     }
-    
-    // 3. Create the Order (only runs if all stock checks/deductions were successful)
+
     const order = new Order({
       orderItems: orderItems.map(item => ({
         ...item,
-        quantity: item.qty,
+        quantity: item.quantity, // ✅ ensure consistency
       })),
       user: req.user._id,
       shippingAddress,
       paymentMethod,
       totalPrice,
-      isPaid: false, 
+      isPaid: false,
       paidAt: null,
       paymentStatus: 'pending',
     });
 
     const createdOrder = await order.save({ session });
 
-    // 4. Commit the transaction (Order saved AND Stock updated)
     await session.commitTransaction();
     session.endSession();
-    
-    res.status(201).json(createdOrder);
 
+    res.status(201).json(createdOrder);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -114,4 +104,96 @@ const getOrders = async (req, res) => {
   res.json(orders);
 };
 
-export { addOrderItems, getOrderById, getMyOrders, getOrders };
+// @desc    Get top selling products for report
+// @route   GET /api/orders/top-selling
+// @access  Private/Admin
+const getTopSellingProducts = async (req, res) => {
+  try {
+    const topSelling = await Order.aggregate([
+      { $unwind: '$orderItems' },
+      {
+        $group: {
+          _id: '$orderItems.product',
+          name: { $first: '$orderItems.name' },
+          totalUnitsSold: { $sum: '$orderItems.quantity' }, // ✅ fixed field name
+          totalRevenue: {
+            $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] }
+          },
+        },
+      },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id',
+          name: 1,
+          totalUnitsSold: 1,
+          totalRevenue: 1,
+        },
+      },
+    ]);
+
+    res.json(topSelling);
+  } catch (error) {
+    console.error('Error fetching top selling products:', error);
+    res.status(500).json({ message: `Aggregation pipeline failed: ${error.message}` });
+  }
+};
+
+// @desc    Get sales data grouped by month
+// @route   GET /api/orders/sales-by-month
+// @access  Private/Admin
+const getSalesByMonth = async (req, res) => {
+  try {
+    const salesByMonth = await Order.aggregate([
+      {
+        $match: {
+          orderItems: { $exists: true, $type: 'array', $ne: [] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          totalRevenue: { $sum: '$totalPrice' },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      {
+        $project: {
+          _id: 0,
+          revenue: '$totalRevenue',
+          month: {
+            $dateToString: {
+              format: '%b %Y',
+              date: {
+                $dateFromParts: {
+                  year: '$_id.year',
+                  month: '$_id.month',
+                  day: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    res.json(salesByMonth);
+  } catch (error) {
+    console.error('Error fetching sales by month report:', error);
+    res.status(500).json({ message: `Aggregation pipeline failed: ${error.message}` });
+  }
+};
+
+export {
+  addOrderItems,
+  getOrderById,
+  getMyOrders,
+  getOrders,
+  getTopSellingProducts,
+  getSalesByMonth,
+};
